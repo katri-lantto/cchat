@@ -58,13 +58,13 @@ handle(St, {message_send, Channel, Msg}) ->
 
     Result = genserver:request(shire,{St,{message_send,Channel,Msg}}),
     case Result of
-        ok -> {reply,Result,st};
+        ok -> {reply,Result,St};
         user_not_joined -> {reply,{error,Result,"user is not in channel"},St};
         channel_doesnt_exit -> {reply,{error,Result,"channel does not exit"},St};
         _-> {reply,{error,something_went_wrong,"something went wrong"},St}
-    end;
+    end; %% här väntar gui på att få svar för att sedan gå vidare till en receive
 
-% ---------------------------------------------------------------------------
+% --------------------------------------------------------------------------
 % The cases below do not need to be changed...
 % But you should understand how they work!
 
@@ -77,8 +77,7 @@ handle(St, {nick, NewNick}) ->
     {reply, ok, St#client_st{nick = NewNick}} ;
 
 % Incoming message (from channel, to GUI)
-handle(St = #client_st{gui = GUI}, {message_receive, Channel, Nick, Msg}) ->
-    io:format("kmr vi hit"),
+handle(St = #client_st{gui = GUI}, {message_receive, Channel, Nick, Msg}) -> %%
     gen_server:call(GUI, {message_receive, Channel, Nick++"> "++Msg}),
     {reply, ok, St} ;
 

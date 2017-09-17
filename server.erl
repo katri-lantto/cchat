@@ -1,5 +1,5 @@
 -module(server).
--export([start/1,stop/1,bajs/2]).
+-export([start/1,stop/1,loop/2]).
 -record(state,{channels}). %% borde väl ha mer än channels??
 -record(client_st, {
     gui, % atom of the GUI process
@@ -15,12 +15,12 @@ start(ServerAtom) ->
     % - Spawn a new process which waits for a message, handles it, then loops infinitely
     % - Register this process to ServerAtom
     % - Return the process ID
-    genserver:start(ServerAtom,#state{channels = dict:new()},fun server:bajs/2).
+    genserver:start(ServerAtom,#state{channels = dict:new()},fun server:loop/2).
 
 
-%%************* ANTAGLIGEN SKA DU KÖRA SPAWN I VARJE BAJS-FUNKTION, för CONCURRENCY
+%% varje channel ska vara en process
 
-bajs(S = #state{channels = Channels},{Client = #client_st{},{join, Channel}}) ->
+loop(S = #state{channels = Channels},{Client = #client_st{},{join, Channel}}) ->
     case dict:find(Channel,Channels) of
         {ok, List} ->
             case lists:member(Client,List) of
@@ -35,7 +35,7 @@ bajs(S = #state{channels = Channels},{Client = #client_st{},{join, Channel}}) ->
             {reply,ok,S#state{channels = NewChannelDict}}
     end;
 
-bajs(S = #state{channels = Channels},{Client = #client_st{},{leave,Channel}}) ->
+loop(S = #state{channels = Channels},{Client = #client_st{},{leave,Channel}}) ->
     case dict:find(Channel, Channels) of
         {ok,List} ->
             case lists:member(Client,List) of
@@ -50,16 +50,12 @@ bajs(S = #state{channels = Channels},{Client = #client_st{},{leave,Channel}}) ->
             {reply,channel_doesnt_exit,S}
     end;
 
-bajs(S = #state{channels = Channels},{Client = #client_st{},{message_send,Channel,Msg}}) ->
-    io:format("hejj"),
+loop(S = #state{channels = Channels},{Client = #client_st{},{message_send,Channel,Msg}}) ->
     case dict:find(Channel, Channels) of
         {ok,List} ->
             case lists:member(Client,List) of
                 true ->
-                    io:format("masdasmd"),
-                    client:handle(Client,{message_receive,Channel,neger,Msg}),
-                    %[client:handle(X, {message_receive, Channel, Client#client_st.nick, Msg})|| X <- List],
-                    io:format("bansnsn"),
+                    [spawn(fun() -> client:handle(X, {message_receive, Channel, Client#client_st.nick, Msg}) end)|| X <- List, X /= Client],
                     {reply,ok,S};
                 false ->
                     {reply,user_not_joined,S}
