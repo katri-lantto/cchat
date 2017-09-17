@@ -1,7 +1,7 @@
 -module(server).
 -export([start/1,stop/1,loop/2]).
--record(state,{channels}). %% borde väl ha mer än channels??
--record(client_st, {
+-record(state,{clients,channels}). %%channels är lista med namn på kanalerna
+-record(client_st, {          %% clients lista  alla möjliga klienter (records)
     gui, % atom of the GUI process
     nick, % nick/username of the client
     server % atom of the chat server
@@ -15,63 +15,46 @@ start(ServerAtom) ->
     % - Spawn a new process which waits for a message, handles it, then loops infinitely
     % - Register this process to ServerAtom
     % - Return the process ID
-    genserver:start(ServerAtom,#state{channels = dict:new()},fun server:loop/2).
+    genserver:start(ServerAtom,#state{clients = [],channels = []},fun server:loop/2).
 
 
 %% varje channel ska vara en process
+loop(S = #state{clients = Clients},{Client = #client_st{},connected}) ->
+    {reply,Client,S#state{clients = Clients++[Client]}};
+
+loop(S = #state{clients = Clients, channels = Channels},{Client = #client_st{},{nick,Nick}}) ->
+    L = lists:filter(fun(X) -> X#client_st.nick == Nick end, Clients),
+    case length(L) of
+        0 ->
+            NewClient = Client#client_st{nick = Nick},
+            [spawn(fun() -> genserver:request(list_to_atom(Channel),{Client,{nick,Nick}}) end) || Channel <- Channels],
+            {reply,ok,S#state{clients = (Clients--[Client])++[NewClient]}};
+        _ ->
+            {reply,nick_taken,S}
+    end;
+
+
+
+
 
 loop(S = #state{channels = Channels},{Client = #client_st{},{join, Channel}}) ->
-    case dict:find(Channel,Channels) of
-        {ok, List} ->
-            case lists:member(Client,List) of
-                true ->
-                    {reply,user_already_joined,S};
-                false ->
-                    NewChannelDict = dict:store(Channel,List++[Client],Channels),
-                    {reply,ok,S#state{channels = NewChannelDict}}
-                end;
-        _ ->
-            NewChannelDict = dict:store(Channel,[Client], Channels),
-            {reply,ok,S#state{channels = NewChannelDict}}
+    case lists:member(Channel,Channels) of
+        true ->
+            Result = genserver:request(list_to_atom(Channel),{join,Client}),
+            {reply,Result,S};
+        false ->
+            channel:init(Channel,[Client]),
+            {reply,ok,S#state{channels = Channels++[Channel]}}
     end;
 
 loop(S = #state{channels = Channels},{Client = #client_st{},{leave,Channel}}) ->
-    case dict:find(Channel, Channels) of
-        {ok,List} ->
-            case lists:member(Client,List) of
-                true ->
-                    NewList = lists:delete(Client,List),
-                    NewChannelDict = dict:store(Channel,NewList,Channels),
-                    {reply,ok,S#state{channels = NewChannelDict}};
-                false ->
-                    {reply,user_not_joined,S}
-            end;
-        _ ->
-            {reply,channel_doesnt_exit,S}
-    end;
-
-loop(S = #state{channels = Channels},{Client = #client_st{},{message_send,Channel,Msg}}) ->
-    case dict:find(Channel, Channels) of
-        {ok,List} ->
-            case lists:member(Client,List) of
-                true ->
-                    [spawn(fun() -> client:handle(X, {message_receive, Channel, Client#client_st.nick, Msg}) end)|| X <- List, X /= Client],
-                    {reply,ok,S};
-                false ->
-                    {reply,user_not_joined,S}
-            end;
-        _ ->
+    case lists:member(Channel, Channels) of
+        true ->
+            Result = genserver:request(list_to_atom(Channel),{leave,Client}),
+            {reply,Result,S};
+        false ->
             {reply,channel_doesnt_exit,S}
     end.
-
-
-
-
-
-
-
-
-
 
 % Stop the server process registered to the given name,
 % together with any other associated processes

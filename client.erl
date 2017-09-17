@@ -12,11 +12,13 @@
 % Return an initial state record. This is called from GUI.
 % Do not change the signature of this function.
 initial_state(Nick, GUIAtom, ServerAtom) ->
-    #client_st{
+    Client = #client_st{
         gui = GUIAtom,
         nick = Nick,
         server = ServerAtom
-    }.
+    },
+genserver:request(shire,{Client,connected}).
+    %% säg till servern att ny klient tillkommit
 
 % handle/2 handles each kind of request from GUI
 % Parameters:
@@ -45,7 +47,7 @@ handle(St, {leave, Channel}) ->
     Result = genserver:request(shire,{St,{leave,Channel}}),
     case Result of
         ok -> {reply,Result,St};
-        user_not_joined -> {reply,{error,Result,"user is not in channel"},St};
+        user_not_in_channel -> {reply,{error,Result,"user is not in channel"},St};
         channel_doesnt_exit -> {reply,{error,Result,"channel does not exit"},St};
         _-> {reply,{error,something_went_wrong,"something went wrong"},St}
     end;
@@ -56,12 +58,10 @@ handle(St, {message_send, Channel, Msg}) ->
     % TODO: Implement this function
     % {reply, ok, St} ;
 
-    Result = genserver:request(shire,{St,{message_send,Channel,Msg}}),
+    Result = genserver:request(list_to_atom(Channel),{St,{message_send,Channel,Msg}}),
     case Result of
         ok -> {reply,Result,St};
-        user_not_joined -> {reply,{error,Result,"user is not in channel"},St};
-        channel_doesnt_exit -> {reply,{error,Result,"channel does not exit"},St};
-        _-> {reply,{error,something_went_wrong,"something went wrong"},St}
+        user_not_in_channel -> {reply,{error,Result,"user is not in channel"},St}
     end; %% här väntar gui på att få svar för att sedan gå vidare till en receive
 
 % --------------------------------------------------------------------------
@@ -74,7 +74,11 @@ handle(St, whoami) ->
 
 % Change nick (no check, local only)
 handle(St, {nick, NewNick}) ->
-    {reply, ok, St#client_st{nick = NewNick}} ;
+    Result = genserver:request(shire,{St,{nick,NewNick}}),
+    case Result of
+        ok -> {reply, Result, St#client_st{nick = NewNick}};
+        nick_taken -> {reply,{error,Result,"Nick already taken!"},St}
+    end;
 
 % Incoming message (from channel, to GUI)
 handle(St = #client_st{gui = GUI}, {message_receive, Channel, Nick, Msg}) -> %%
