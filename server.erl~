@@ -11,9 +11,6 @@
 %%%********************************************
 % stänger av severn, sätter på servern igen???
 % meddela alla kanaler när klienten lämnar
-% lämna en kanal när servern är nedstängd??
-% byta nick när servern är nere?
-% quit när servern är nere?
 
 %%***************************************
 

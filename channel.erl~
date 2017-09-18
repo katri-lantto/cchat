@@ -46,5 +46,5 @@ loop(S = #state{clients = Clients},{Client = #client_st{},{message_send,Channel,
             {reply,ok,S};
         false ->
             {reply,user_not_in_channel,S}
-    end.
+    end;
 

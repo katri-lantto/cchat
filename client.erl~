@@ -70,7 +70,7 @@ handle(St, {message_send, Channel, Msg}) ->
 
 % Get current nick
 handle(St, whoami) ->
-    {reply, St#client_st.nick, St};
+    {reply, St#client_st.nick, St} ;
 
 % Change nick (no check, local only)
 handle(St, {nick, NewNick}) ->
