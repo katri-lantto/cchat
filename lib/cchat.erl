@@ -10,5 +10,6 @@ server() ->
 client() ->
     gui:start(?SERVERNAME).
 
+% stop a server
 stop() ->
 	server:stop(?SERVERNAME).
