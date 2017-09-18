@@ -23,13 +23,12 @@ loop(S = #state{clients = Clients},{Client = #client_st{},connected}) ->
     {reply,Client,S#state{clients = Clients++[Client]}};
 
 loop(S = #state{clients = Clients, channels = Channels},{Client = #client_st{},{nick,Nick}}) ->
-    L = lists:filter(fun(X) -> X#client_st.nick == Nick end, Clients),
-    case length(L) of
-        0 ->
+    case lists:any(fun(X) -> X#client_st.nick == Nick end, Clients) of
+        false ->
             NewClient = Client#client_st{nick = Nick},
             [spawn(fun() -> genserver:request(list_to_atom(Channel),{Client,{nick,Nick}}) end) || Channel <- Channels],
             {reply,ok,S#state{clients = (Clients--[Client])++[NewClient]}};
-        _ ->
+        true ->
             {reply,nick_taken,S}
     end;
 
