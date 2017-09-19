@@ -8,6 +8,7 @@
 % lämna en kanal när servern är nedstängd??
 % byta nick när servern är nere?
 % quit när servern är nere?
+% servern nere men kanalerna lever?
 
 %%***************************************
 
