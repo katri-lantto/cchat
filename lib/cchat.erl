@@ -9,3 +9,4 @@ server() ->
 % Start a client GUI
 client() ->
     gui:start(?SERVERNAME).
+
